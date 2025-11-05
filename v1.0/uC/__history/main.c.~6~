@@ -1,0 +1,177 @@
+#include <18F4550.h> 
+#fuses HSPLL,NOWDT,NOPROTECT,NOLVP,NODEBUG,PLL5,VREGEN 
+#use delay(clock=20000000) 
+
+
+#use i2c(master,sda=PIN_B0,scl=PIN_B1)
+
+
+
+#include "ds1307.c"
+#include "conversion.c"
+
+#include "one_wire.c"
+#include "ds1820.c"
+
+
+/////////////////////////////////////////////////////////////////////////////  
+#define LED_ON output_low 
+#define LED_OFF output_high 
+
+char swich1 = 'f';
+char swich2 = 'f';
+float temperature;
+byte sec,min,hour,day,month,year;
+
+
+//////////////////////////URZADZENIA PERYFERYJNE//////////////////////////////////////////////// 
+
+void beep()
+{
+   Output_high (PIN_B4) ;
+   delay_ms (1000) ;
+   Output_low (PIN_B4) ;
+}
+
+void relay1()
+{
+   //jesli wylaczony to wlaczyc
+   if (swich1 == 'f')
+   {
+      Output_high (PIN_D5) ;
+      swich1 = 'n';
+   }
+
+   //byl wlaczony to wylaczyc
+   else
+   {
+      Output_low (PIN_D5) ;
+      swich1 = 'f';
+   }
+}
+
+//MOCE sa na rc6 i rd3
+
+void relay2()
+{
+   //jesli wylaczony to wlaczyc
+   if (swich2 == 'f')
+   {
+      Output_high (PIN_D4) ;
+      swich2 = 'n';
+   }
+
+   //byl wlaczony to wylaczyc
+   else
+   {
+      Output_low (PIN_D4) ;
+      swich2 = 'f';
+   }
+}
+
+//ustawianie zegara
+void set_time()
+{
+   unsigned int t;
+   
+   //printf(usb_cdc_putc, "\nday");
+   t = usb_cdc_getc(); 
+   //write_ds1307 (4, decToBcd(t)); //day
+
+   //printf(usb_cdc_putc, "\nmonth");
+   t = usb_cdc_getc();
+   write_ds1307 (5, decToBcd(t)); //month
+
+   //printf(usb_cdc_putc, "\nyear");
+   t = usb_cdc_getc();
+   write_ds1307 (6, decToBcd(t)); //year
+
+   //printf(usb_cdc_putc, "\nhour");
+   t = usb_cdc_getc();
+   write_ds1307 (2, decToBcd(t)); //hour
+
+   //printf(usb_cdc_putc, "\nmin");
+   t = usb_cdc_getc();
+   write_ds1307 (1, decToBcd(t)); //minute
+
+   //printf(usb_cdc_putc, "\nsek");
+   t = usb_cdc_getc();
+   write_ds1307 (0, decToBcd(t)); //second
+}
+
+//czytanie zegara
+void read_time()
+{
+   sec = bcdToDec(read_ds1307 (0)); // read second
+   min = bcdToDec(read_ds1307 (1)); // read minute
+   hour = bcdToDec(read_ds1307 (2)); // read hour
+   day = bcdToDec(read_ds1307 (4)); // read day
+   month = bcdToDec(read_ds1307 (5)); // read month
+   year = bcdToDec(read_ds1307 (6)); // read year
+}
+
+
+////////////////////////MAIN///////////////////////////////////////////////////// 
+
+void main(void) { 
+   char c; 
+   
+   beep();
+   relay1();
+   
+   //usb_init_cs();
+
+
+    //for  10 bit resolution mod
+    /*  
+    onewire_write(0xCC); 
+    onewire_write(0x4E); 
+
+    onewire_write(125); 
+    onewire_write(-55); //this should be done for proper working of DS18B20 
+    onewire_write(127); 
+
+    onewire_reset(); 
+    onewire_write(0xCC); 
+    onewire_write(0x48); 
+    delay_ms(15); 
+    */
+   delay_ms(1000); 
+   beep();
+   relay1();
+
+   while (TRUE) {
+  TRUE ; 
+      /*
+      usb_task(); 
+      usb_debug_task(); 
+
+      if (kbhit()) { 
+         //odebranie z uart znaku
+         c=getc(); 
+         //przekazanie znaku na usb
+         usb_cdc_putc(c);
+      } 
+      if (usb_cdc_kbhit()) { 
+
+         c=usb_cdc_getc(); 
+
+         switch (c){
+                   case 'm': relay1(); blink_green(); break;
+                   case 'n': relay2(); blink_green(); break;
+                   case 's': beep(); break;
+                   case 'u': up(); break;
+                   case 'd': down(); break;
+                   case 'l': left(); break;
+                   case 'r': right(); break;
+                   case 'o': set_time(); blink_green(); break;
+                   case 'y': read_time(); printf (usb_cdc_putc,"%d-%d-%d %d:%d:%d", day, month, year, hour, min, sec); blink_green(); break;
+                   case 't': temperature = ds1820_read(); printf(usb_cdc_putc,"%3.1f",temperature);  blink_green(); break;
+                   case 'p': printf(usb_cdc_putc, "ok");  blink_green(); break;
+                   default:  break;
+         }
+      }
+      */
+     } 
+     
+}

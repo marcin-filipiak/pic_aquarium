@@ -1,0 +1,46 @@
+#include <16F877A.h>
+#device ADC=10
+
+#FUSES NOWDT                    //No Watch Dog Timer
+#FUSES NOBROWNOUT               //No brownout reset
+#FUSES NOLVP                    //No low voltage prgming, B3(PIC16) or B5(PIC18) used for I/O
+
+#use delay(crystal=20000000)
+
+#use i2c(master,sda=PIN_B0,scl=PIN_B1)
+
+//////////////definicje stalych///////////////////////////////////
+
+#define E_UP   0
+#define E_DOWN 1
+#define E_OK   2
+#define E_IDLE 3
+
+#define EEPROM_TEMP            0x00 //temperatura
+#define EEPROM_LIGHT_HOUR_ON   0x1  //godzina wlaczenia swiatla
+#define EEPROM_LIGHT_MIN_ON    0x2  //minuta wlaczenia swiatla
+
+#define EEPROM_LIGHT_HOUR_OFF  0x3  //godzina wylaczenia swiatla
+#define EEPROM_LIGHT_MIN_OFF   0x4  //minuta wylaczenia swiatla
+
+//#define EEPROM_ID_TSENSOR_AQUA 0x5  //numer czujnika temperatury wody
+//#define EEPROM_ID_TSENSOR_ROOM 0x6  //numer czujnika temperatury pokojowej
+
+#define EEPROM_FEED_HOUR_CYCLE 0x5 //cykl co ile godzin wlaczyc karmienie
+#define EEPROM_FEED_SEC_DELAY  0x6 //czas wlaczenia karmienia
+
+#define EEPROM_AIR_HOUR_CYCLE 0x7 //cykl co ile godzin wlaczyc powietrze
+#define EEPROM_AIR_MIN_DELAY  0x8 //czas wlaczenia powietrza
+
+/////////////definicje pinow//////////////////////////////////////
+#define P_FEED          PIN_C3 //karmienie
+#define P_AIR           PIN_D0 //napowietrzanie
+#define P_LIGHT         PIN_C1 //oswietlenie triak
+#define P_HEATER        PIN_C2 //grzalka triak
+#define P_BEEPER        PIN_D1 //sygnalizator dzwiekowy
+#define P_LCDLIGHT      PIN_D2 //podswietlenie ekranu
+#define DQ              PIN_B3 //dane 1wire
+
+/////////////definicje stanow/////////////////////////////////////
+#define OFF output_low 
+#define ON  output_high

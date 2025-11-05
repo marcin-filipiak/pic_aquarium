@@ -1,0 +1,35 @@
+#include <16f877.h> 
+#fuses HS, NOWDT,NOPROTECT,NOBROWNOUT,NOLVP,PUT 
+
+#use delay(clock = 16000000) 
+
+#byte PORTA = 0x05 
+#byte PORTB = 0x06 
+#byte PORTC = 0x07 
+#byte PORTD = 0x06 
+#byte TRISA = 0x85 
+#byte TRISB = 0x86 
+#byte TRISC = 0x87 
+#byte TRISD = 0x88 
+
+//////////////////////////URZADZENIA PERYFERYJNE//////////////////////////////////////////////// 
+
+
+
+
+void beep()
+{
+   Output_high (PIN_B4) ;
+   delay_ms (1000) ;
+   Output_low (PIN_B4) ;
+   delay_ms (1000) ;
+}
+
+////////////////////////MAIN///////////////////////////////////////////////////// 
+
+void main(void) { 
+   beep();
+   while (TRUE) { 
+      beep();
+   } 
+}

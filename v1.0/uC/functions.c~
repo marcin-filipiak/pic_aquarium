@@ -1,0 +1,316 @@
+/*
+Adresy w EEPROM nastaw
+
+0x00 - temperatura
+
+0x1  - godzina wlaczenia swiatla
+0x2  - minuta wlaczenia swiatla
+
+0x3  - godzina wylaczenia swiatla
+0x4  - minuta wylaczenia swiatla
+*/
+
+
+
+
+/*
+  sprawdzenie jaki przycisk z panelu sterowania jest klik
+  domyslny stan pinow na rezystorze podciagajacym:
+  E_OK   (E2) - false
+  E_DOWN (C0) - true
+  E_UP   (C1) - true
+  po ich wcisnieciu stan przeciwny do domyslnego, 
+  czyli aktywacja sygnalem odwrotnym do domyslnego.
+*/
+int getButton() {
+    if (input(PIN_E2) == true) {
+        delay_ms(300);
+        return E_OK;
+    } else if (input(PIN_C0) == false) {
+        delay_ms(300);
+        return E_DOWN;
+    } else if (input(PIN_C1) == false) {
+        delay_ms(300);
+        return E_UP;
+    }
+    else return E_IDLE;
+}
+
+/*
+ sygnal dzwiekowy
+*/
+void beep(){
+      ON(P_BEEPER);
+      delay_ms(100);
+      OFF(P_BEEPER);
+      delay_ms(5);
+}
+
+/*
+ zmiana stanu
+ przekaznika 1 (oswietlenie)
+*/
+void relay_light()
+{
+   //jesli wylaczony to wlaczyc
+   if (swich1 == 'f')
+   {
+      ON(P_light);
+      swich1 = 'n';
+   }
+
+   //byl wlaczony to wylaczyc
+   else
+   {
+      OFF(P_light);
+      swich1 = 'f';
+   }
+}
+
+/*
+wyswietlenie na ekranie 
+informacji o temperaturze
+*/
+void print_temp(float &t){
+   int l=1;
+   
+
+   /*
+   printf(lcd_putc, "%3.1f", t); 
+   lcd_send_byte(1,0x2); //stopnie celsjusza
+   */
+   
+   if (DS1820_FindFirstDevice()){
+            do
+            {
+                lcd_gotoxy(10,l);
+                temperature_float = DS1820_GetTempFloat();
+                printf(lcd_putc,"%d:%f°C", l, temperature_float); 
+                l ++;
+            }
+            while ( DS1820_FindNextDevice() );
+   }
+   
+   
+}
+
+/*
+wyswietlenie na ekranie
+funkcji klawiszy przewijania menu
+*/
+void print_menubar(){
+   lcd_gotoxy(1,2);
+   lcd_putc("<"); //strzalka w lewo
+   lcd_gotoxy(8,2);
+   //lcd_putc((char)126); //enter
+   lcd_putc("ok");
+   lcd_gotoxy(16,2);
+   lcd_putc(">"); //strzalka w prawo
+}
+
+
+/*
+ustawienie w menu temperatury
+*/
+void SetTemperature(){
+    boolean run=true;
+    int8 t;
+
+    t = read_eeprom(0x00);
+    //jesli nie jest ustawiona to napewno nie jest 255stopni ustawienie domyslnej 25stopni
+    if (t == 255) t=25;
+
+    lcd_putc("\f");
+    print_menubar();
+    delay_ms(800);
+    while(run){
+        delay_ms(100);
+        lcd_gotoxy(2,1);
+        printf(lcd_putc, "Utrzymuj %u ", t); 
+        lcd_send_byte(1,0x2); //stopnie celsjusza
+        
+        switch(getButton()){
+            case E_DOWN:
+                t = t-1;
+                break;
+            case E_UP:
+                t = t+1;
+                break;
+            case E_OK:
+                write_eeprom(0x00,t);
+                run=false;
+        }
+    }
+
+}
+
+/*
+ustawianie godziny
+*/
+int8 menu_hour(int8 h)
+{
+   boolean run=true;
+   lcd_putc("\f");
+   print_menubar();
+   delay_ms(800);
+   //ustawianie godziny
+   while(run){
+        delay_ms(100);
+        lcd_gotoxy(2,1);
+        printf(lcd_putc, "Godzina %u ", h); 
+        
+        switch(getButton()){
+            case E_DOWN:
+                h = h-1;
+                if(h<0 || h==255) h=24;
+                break;
+            case E_UP:
+                h = h+1;
+                if(h>24) h=0;
+                break;
+            case E_OK:                
+                run=false;
+        }
+    }
+    return h;
+}
+
+/*
+ustawianie minut
+*/
+int8 menu_minute(int8 m)
+{
+   boolean run=true;
+   lcd_putc("\f");
+   print_menubar();
+   delay_ms(800);
+   while(run){
+        delay_ms(100);
+        lcd_gotoxy(2,1);
+        printf(lcd_putc, "Minuta %u ", m); 
+        
+        switch(getButton()){
+            case E_DOWN:
+                m = m-1;
+                if(m<0 || m==255) m=59;
+                break;
+            case E_UP:
+                m = m+1;
+                if(m>59) m=0;
+                break;
+            case E_OK:                
+                run=false;
+        }
+    }
+    return m;
+}
+
+//czytanie zegara
+void read_time()
+{
+   sec = bcdToDec(read_ds1307 (0)); // read second
+   min = bcdToDec(read_ds1307 (1)); // read minute
+   hour = bcdToDec(read_ds1307 (2)); // read hour
+   //day = bcdToDec(read_ds1307 (4)); // read day
+   //month = bcdToDec(read_ds1307 (5)); // read month
+   //year = bcdToDec(read_ds1307 (6)); // read year
+}
+
+
+/*
+obsluga menu
+*/
+void change_menu(){
+
+    #define MENU_ELEMENTS 4
+    
+    //przesuniecie sie po menu w gore
+    if (menu_event == E_UP && menu_pos < MENU_ELEMENTS && menu_select==false){ menu_pos++; beep();}
+    //przesuniecie sie po menu w dol
+    if (menu_event == E_DOWN && 0 < menu_pos && menu_select==false){ menu_pos--; beep();}
+    //zatwierdzenie opcji w menu
+    if (menu_event == E_OK && menu_pos!=0) menu_select = true;
+
+    switch(menu_pos){
+        case 0:
+            lcd_putc("\fOpusc menu");
+            print_menubar();
+            delay_ms(1000);
+            menu_select=false;
+            menu_pos=0;
+            lcd_putc("\f");
+            break;
+        case 1:
+            lcd_putc("\fTemperatura");
+            print_menubar();
+            if (menu_select) {
+                SetTemperature();
+                beep();
+                beep();
+                menu_select=false;
+                menu_pos=0;
+                lcd_putc("\f");
+            }
+            break;
+        case 2:
+            lcd_putc("\fWl.oswietlenia");
+            print_menubar();
+            if (menu_select) {
+                write_eeprom(0x01,menu_hour(read_eeprom(0x01)));
+                write_eeprom(0x02,menu_minute(read_eeprom(0x02)));
+                printf(lcd_putc, "\fUstawiono %u:%u", read_eeprom(0x01), read_eeprom(0x02));
+                delay_ms(2000);
+                beep();
+                beep();
+                menu_select=false;
+                menu_pos=0;
+                lcd_putc("\f");
+            }
+            break;            
+        case 3:
+            lcd_putc("\fWyl.oswietlenia");
+            print_menubar();
+            if (menu_select) {
+                write_eeprom(0x03,menu_hour(read_eeprom(0x03)));
+                write_eeprom(0x04,menu_minute(read_eeprom(0x04)));
+                printf(lcd_putc, "\fUstawiono %u:%u", read_eeprom(0x03), read_eeprom(0x04));
+                delay_ms(2000);
+                beep();
+                beep();
+                menu_select=false;
+                menu_pos=0;
+                lcd_putc("\f");
+            }
+            break;            
+        case 4:
+            lcd_putc("\fCzas");
+            print_menubar();
+            if (menu_select) {
+                printf(lcd_putc, "\fUstawiono %u:%u", menu_hour(12),menu_minute(25));
+                //todo: zapis godziny
+                //write_ds1307 (2, decToBcd(t)); //hour
+                //write_ds1307 (1, decToBcd(t)); //minute 
+                delay_ms(3000);
+                beep();
+                beep();
+                menu_select=false;
+                menu_pos=0;
+                lcd_putc("\f");
+            }
+            break;            
+         case 5:
+            lcd_putc("\fReset ustawien");
+            print_menubar();
+            if (menu_select) {
+                beep();
+                beep();
+                write_eeprom(0x00,0x19);  //reset nastawu temperatury na hex19 czyli dec25
+                menu_select=false;
+                menu_pos=0;
+                beep();
+                lcd_putc("\f");
+            }
+            break;
+            
+    }
+}

@@ -1,0 +1,67 @@
+#include <main.h>
+
+char swich1 = 'f';
+char swich2 = 'f';
+float temperature;
+
+
+//////////////////////////URZADZENIA PERYFERYJNE//////////////////////////////////////////////// 
+
+void beep()
+{
+   Output_high (PIN_B4) ;
+   delay_ms (1000) ;
+   Output_low (PIN_B4) ;
+}
+
+void relay1()
+{
+   //jesli wylaczony to wlaczyc
+   if (swich1 == 'f')
+   {
+      Output_high (PIN_C7) ;
+      swich1 = 'n';
+   }
+
+   //byl wlaczony to wylaczyc
+   else
+   {
+      Output_low (PIN_C7) ;
+      swich1 = 'f';
+   }
+}
+
+//MOCE sa na rc6 i rd3
+
+void relay2()
+{
+   //jesli wylaczony to wlaczyc
+   if (swich2 == 'f')
+   {
+      Output_high (PIN_D4) ;
+      swich2 = 'n';
+   }
+
+   //byl wlaczony to wylaczyc
+   else
+   {
+      Output_low (PIN_D4) ;
+      swich2 = 'f';
+   }
+}
+
+////////////////////////////////////MAIN////////////////////////////
+
+void main()
+{
+OSCCON = 0xF2; // internal oscillator, 8MHz
+TRISD = 0;
+TRISA = 0;
+TRISB = 0;
+
+	while(TRUE)
+	{
+		beep();
+	}
+
+}

@@ -1,0 +1,77 @@
+/*
+        Biblioteka traktujaca rezystor B1K podlaczony
+        do portu analogowego uC jako sterownika gora-srodek-dol
+*/
+
+
+#define E_UP     1
+#define E_OK     2
+#define E_DOWN   3
+#define E_IDLE   0
+
+#define R_CD   600        //rezystancja skrajna pozycji srodkowej dolnej
+#define R_CU   950        //rezystancja skrajna pozycji srodkowej gornej
+
+char enterimp = 4; //zmienna przechowywujaca ile impulsow na srodku
+
+/*
+        Odczyt pozycji rezystora
+*/
+int ReadResistometr(int16 a){
+        //srodek
+        if (a>R_CD && a<R_CU){
+                return E_OK;
+        }
+        //dol
+        if (a<R_CD){
+                return E_DOWN;
+        }
+        //gora
+        if (a>R_CU){
+                return E_UP;
+        }
+        
+}
+
+/*
+ x       Traktowanie potencjometra jako
+        sterownika menu. 
+        gora - enter - dol
+        enter wybierany jest raz, gdy
+        jest zatrzymany w tej pozycji przez okreslony czas.
+*/
+int ReadResistometrMenu(int16 a){
+        //srodek
+        if (a>R_CD && a<R_CU){
+                if (enterimp==3){
+                        enterimp = enterimp + 1;
+                        //printf(lcd_putc," ok ");
+                        delay_us(1000);
+                        return E_OK;        
+                }
+                if (enterimp < 4){
+                        enterimp = enterimp + 1;
+                        delay_ms(500);
+                        //printf(lcd_putc," idle ");
+                        delay_us(1000);
+                        return E_IDLE;
+                }
+        }
+        //dol
+        if (a<R_CD){
+                enterimp = 0;
+                //printf(lcd_putc," down ");
+                delay_us(1000);
+                return E_DOWN;
+        }
+        //gora
+        if (a>R_CU){
+                enterimp = 0;        
+                //printf(lcd_putc," up ");
+                delay_us(1000);
+                return E_UP;
+        }
+        
+        return E_IDLE;
+        
+}

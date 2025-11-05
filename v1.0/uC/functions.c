@@ -1,0 +1,464 @@
+
+
+/*
+  sprawdzenie jaki przycisk z panelu sterowania jest klik
+  domyslny stan pinow na rezystorze podciagajacym:
+  E_OK   (E2) - false
+  E_DOWN (C0) - true
+  E_UP   (C1) - true
+  po ich wcisnieciu stan przeciwny do domyslnego, 
+  czyli aktywacja sygnalem odwrotnym do domyslnego.
+*/
+int getButton() {
+    if (input(PIN_E2) == true) {
+        delay_ms(300);
+        return E_OK;
+    } else if (input(PIN_C0) == false) {
+        delay_ms(300);
+        return E_DOWN;
+    } else if (input(PIN_C1) == false) {
+        delay_ms(300);
+        return E_UP;
+    }
+    else return E_IDLE;
+}
+
+/*
+ sygnal dzwiekowy
+*/
+void beep(){
+      ON(P_BEEPER);
+      delay_ms(10);
+      OFF(P_BEEPER);
+      delay_ms(5);
+}
+
+/*
+ zmiana stanu
+ przekaznika 1 (oswietlenie)
+*/
+void relay_light()
+{
+   //jesli wylaczony to wlaczyc
+   if (swich1 == 'f')
+   {
+      ON(P_light);
+      swich1 = 'n';
+   }
+
+   //byl wlaczony to wylaczyc
+   else
+   {
+      OFF(P_light);
+      swich1 = 'f';
+   }
+}
+
+/*
+wyswietlenie na ekranie 
+informacji o temperaturze
+w akwarium
+*/
+void print_aqua_temp(float t){
+   lcd_gotoxy(1,2);
+   /*
+   sprintf(ctemp, "%3.1f", ds1820_read());
+   for (x=0; x<4; x++){ 
+           lcd_putc(ctemp[x]);
+   }*/
+   lcd_send_byte(1,0x4); //symbol wody
+   printf(lcd_putc, "%3.1f", t); 
+   lcd_send_byte(1,0x2); //stopnie celsjusza
+   
+   
+}
+
+
+
+/*
+wyswietlenie na ekranie 
+informacji o temperaturze
+w pomieszczeniu
+*/
+void print_room_temp(float t){
+   lcd_gotoxy(11,2);
+   /*
+   sprintf(ctemp, "%3.1f", ds1820_read());
+   for (x=0; x<4; x++){ 
+           lcd_putc(ctemp[x]);
+   }*/
+   lcd_send_byte(1,0x5); //symbol domku
+   printf(lcd_putc, "%3.1f", t); 
+   lcd_send_byte(1,0x2); //stopnie celsjusza
+   
+   
+}
+
+void print_time(){
+  lcd_gotoxy(11,1);
+  lcd_send_byte(1,0x6); //symbol zegarka
+  printf(lcd_putc, "%d:%d", hour,min);
+}
+
+/*
+wyswietlenie na ekranie
+funkcji klawiszy przewijania menu
+*/
+void print_menubar(){
+   lcd_gotoxy(1,2);
+   lcd_putc("<"); //strzalka w lewo
+   lcd_gotoxy(8,2);
+   //lcd_putc((char)126); //enter
+   lcd_putc("ok");
+   lcd_gotoxy(16,2);
+   lcd_putc(">"); //strzalka w prawo
+}
+
+
+
+/*
+ustawienie w menu temperatury
+*/
+void SetSensors(){
+    boolean run=true;
+    float t_room, t_aqua;
+    
+    lcd_putc("\f");
+
+    while(run){
+    
+        read_eeprom(EEPROM_ID_TSENSOR_AQUA);
+        read_eeprom(EEPROM_ID_TSENSOR_ROOM);
+        delay_ms(500);
+        
+        t_room = ds1820_read(read_eeprom(EEPROM_ID_TSENSOR_ROOM));
+        delay_ms(500);
+        t_aqua = ds1820_read(read_eeprom(EEPROM_ID_TSENSOR_AQUA));
+        
+        lcd_gotoxy(1,1);
+        lcd_send_byte(1,0x4); //symbol wody
+        printf(lcd_putc, "%3.1f", t_aqua); 
+        lcd_send_byte(1,0x2); //stopnie celsjusza
+        printf(lcd_putc, "  ",); 
+        lcd_send_byte(1,0x5); //symbol domku
+        printf(lcd_putc, "%3.1f",  t_room); 
+        lcd_send_byte(1,0x2); //stopnie celsjusza
+        
+        print_menubar();
+        
+        switch(getButton()){
+            case E_DOWN:
+                write_eeprom(EEPROM_ID_TSENSOR_AQUA,0x2);
+                write_eeprom(EEPROM_ID_TSENSOR_ROOM,0x1);
+                beep();
+                printf(lcd_putc, "\fCzekaj...");
+                break;
+            case E_UP:
+                write_eeprom(EEPROM_ID_TSENSOR_AQUA,0x1);
+                write_eeprom(EEPROM_ID_TSENSOR_ROOM,0x2);
+                beep();
+                printf(lcd_putc, "\fCzekaj...");
+                break;
+            case E_OK:
+                run=false;
+        }
+    }
+
+}
+
+/*
+ustawienie w menu temperatury
+*/
+void SetTemperature(){
+    boolean run=true;
+    int8 t;
+
+    t = read_eeprom(0x00);
+    //jesli nie jest ustawiona to napewno nie jest 255stopni ustawienie domyslnej 25stopni
+    if (t == 255) t=25;
+
+    lcd_putc("\f");
+    print_menubar();
+    delay_ms(800);
+    while(run){
+        delay_ms(100);
+        lcd_gotoxy(2,1);
+        printf(lcd_putc, "Utrzymuj %u ", t); 
+        lcd_send_byte(1,0x2); //stopnie celsjusza
+        
+        switch(getButton()){
+            case E_DOWN:
+                t = t-1;
+                break;
+            case E_UP:
+                t = t+1;
+                break;
+            case E_OK:
+                write_eeprom(0x00,t);
+                run=false;
+        }
+    }
+
+}
+
+/*
+ustawianie godziny
+*/
+int8 menu_hour(int8 h)
+{
+   boolean run=true;
+   lcd_putc("\f");
+   print_menubar();
+   delay_ms(800);
+   //ustawianie godziny
+   while(run){
+        delay_ms(100);
+        lcd_gotoxy(2,1);
+        printf(lcd_putc, "Godzina %u  ", h); 
+        
+        switch(getButton()){
+            case E_DOWN:
+                h = h-1;
+                if(h<0 || h==255) h=24;
+                break;
+            case E_UP:
+                h = h+1;
+                if(h>24) h=0;
+                break;
+            case E_OK:                
+                run=false;
+        }
+    }
+    return h;
+}
+
+/*
+ustawianie minut
+*/
+int8 menu_minute(int8 m)
+{
+   boolean run=true;
+   lcd_putc("\f");
+   print_menubar();
+   delay_ms(800);
+   while(run){
+        delay_ms(100);
+        lcd_gotoxy(2,1);
+        printf(lcd_putc, "Minuta %u  ", m); 
+        
+        switch(getButton()){
+            case E_DOWN:
+                m = m-1;
+                if(m<0 || m==255) m=59;
+                break;
+            case E_UP:
+                m = m+1;
+                if(m>59) m=0;
+                break;
+            case E_OK:                
+                run=false;
+        }
+    }
+    return m;
+}
+
+/*
+ustawianie sekund
+*/
+int8 menu_sec(int8 s)
+{
+   boolean run=true;
+   lcd_putc("\f");
+   print_menubar();
+   delay_ms(800);
+   while(run){
+        delay_ms(100);
+        lcd_gotoxy(2,1);
+        printf(lcd_putc, "Sekund %u  ", s); 
+        
+        switch(getButton()){
+            case E_DOWN:
+                s = s-1;
+                if(s<0 || s==255) s=59;
+                break;
+            case E_UP:
+                s = s+1;
+                if(s>59) s=0;
+                break;
+            case E_OK:                
+                run=false;
+        }
+    }
+    return s;
+}
+
+//czytanie zegara
+void read_time()
+{
+   sec = bcdToDec(read_ds1307 (0)); // read second
+   min = bcdToDec(read_ds1307 (1)); // read minute
+   hour = bcdToDec(read_ds1307 (2)); // read hour
+   //day = bcdToDec(read_ds1307 (4)); // read day
+   //month = bcdToDec(read_ds1307 (5)); // read month
+   //year = bcdToDec(read_ds1307 (6)); // read year
+}
+
+//ustawianie zegara
+void set_time()
+{
+   write_ds1307 (4, decToBcd(1)); //day
+   write_ds1307 (5, decToBcd(1)); //month
+   write_ds1307 (6, decToBcd(0)); //year
+   write_ds1307 (2, decToBcd(hour)); //hour;
+   write_ds1307 (1, decToBcd(min)); //minute
+   write_ds1307 (0, decToBcd(0)); //second
+
+}
+
+
+/*
+obsluga menu
+*/
+void change_menu(){
+
+    #define MENU_ELEMENTS 8
+    
+    //przesuniecie sie po menu w gore
+    if (menu_event == E_UP && menu_pos < MENU_ELEMENTS && menu_select==false){ menu_pos++; beep();}
+    //przesuniecie sie po menu w dol
+    if (menu_event == E_DOWN && 0 < menu_pos && menu_select==false){ menu_pos--; beep();}
+    //zatwierdzenie opcji w menu
+    if (menu_event == E_OK && menu_pos!=0) menu_select = true;
+
+    switch(menu_pos){
+        case 0:
+            lcd_putc("\fOpusc menu");
+            print_menubar();
+            delay_ms(1000);
+            menu_select=false;
+            menu_pos=0;
+            lcd_putc("\f");
+            break;
+        case 1:
+            lcd_putc("\fTemperatura");
+            print_menubar();
+            if (menu_select) {
+                SetTemperature();
+                beep();
+                beep();
+                menu_select=false;
+                menu_pos=0;
+                lcd_putc("\f");
+            }
+            break;
+        case 2:
+            lcd_putc("\fWl.oswietlenia");
+            print_menubar();
+            if (menu_select) {
+                write_eeprom(EEPROM_LIGHT_HOUR_ON,menu_hour(read_eeprom(EEPROM_LIGHT_HOUR_ON)));
+                write_eeprom(EEPROM_LIGHT_MIN_ON,menu_minute(read_eeprom(EEPROM_LIGHT_MIN_ON)));
+                printf(lcd_putc, "\fUstawiono %u:%u", read_eeprom(EEPROM_LIGHT_HOUR_ON), read_eeprom(EEPROM_LIGHT_MIN_ON));
+                delay_ms(2000);
+                beep();
+                beep();
+                menu_select=false;
+                menu_pos=0;
+                lcd_putc("\f");
+            }
+            break;            
+        case 3:
+            lcd_putc("\fWyl.oswietlenia");
+            print_menubar();
+            if (menu_select) {
+                write_eeprom(EEPROM_LIGHT_HOUR_OFF,menu_hour(read_eeprom(EEPROM_LIGHT_HOUR_OFF)));
+                write_eeprom(EEPROM_LIGHT_MIN_OFF,menu_minute(read_eeprom(EEPROM_LIGHT_MIN_OFF)));
+                printf(lcd_putc, "\fUstawiono %u:%u", read_eeprom(EEPROM_LIGHT_HOUR_OFF), read_eeprom(EEPROM_LIGHT_MIN_OFF));
+                delay_ms(2000);
+                beep();
+                beep();
+                menu_select=false;
+                menu_pos=0;
+                lcd_putc("\f");
+            }
+            break;
+        case 4:
+            lcd_putc("\fPrzekaznik 1");
+            print_menubar();
+            if (menu_select) {
+                write_eeprom(EEPROM_RELAY1_HOUR_CYCLE,menu_hour(read_eeprom(EEPROM_RELAY1_HOUR_CYCLE)));
+                write_eeprom(EEPROM_RELAY1_SEC_DELAY,menu_sec(read_eeprom(EEPROM_RELAY1_SEC_DELAY)));
+                printf(lcd_putc, "\fUruchomienie\nco %u h/%u s", read_eeprom(EEPROM_RELAY1_HOUR_CYCLE), read_eeprom(EEPROM_RELAY1_SEC_DELAY));
+                delay_ms(2000);
+                beep();
+                beep();
+                menu_select=false;
+                menu_pos=0;
+                lcd_putc("\f");
+            }
+            break;
+        case 5:
+            lcd_putc("\fPrzekaznik 2");
+            print_menubar();
+            if (menu_select) {
+                write_eeprom(EEPROM_RELAY2_HOUR_CYCLE,menu_hour(read_eeprom(EEPROM_RELAY2_HOUR_CYCLE)));
+                write_eeprom(EEPROM_RELAY2_SEC_DELAY,menu_sec(read_eeprom(EEPROM_RELAY2_SEC_DELAY)));
+                printf(lcd_putc, "\fUruchomienie\nco %u h/%u s", read_eeprom(EEPROM_RELAY2_HOUR_CYCLE), read_eeprom(EEPROM_RELAY2_SEC_DELAY));
+                delay_ms(2000);
+                beep();
+                beep();
+                menu_select=false;
+                menu_pos=0;
+                lcd_putc("\f");
+            }
+            break;
+        case 6:
+            lcd_putc("\fZegar");
+            print_menubar();
+            if (menu_select) {
+                hour = menu_hour(hour);
+                min = menu_minute(min);
+                printf(lcd_putc, "\fUstawiono %u:%u", hour,min);
+                //zapis
+                set_time();
+                delay_ms(3000);
+                beep();
+                beep();
+                menu_select=false;
+                menu_pos=0;
+                lcd_putc("\f");
+            }
+            break; 
+         case 7:
+            lcd_putc("\fCzujniki");
+            print_menubar();
+            if (menu_select){
+               SetSensors();
+               menu_select=false;
+               menu_pos=0;
+               lcd_putc("\f");
+            }
+            break;
+         case 8:
+            lcd_putc("\fReset ustawien");
+            print_menubar();
+            if (menu_select) {
+                beep();
+                beep();
+                write_eeprom(EEPROM_TEMP,0x19);  //reset nastawu temperatury na hex19 czyli dec25 czyli 25 stopni celsiusza
+                write_eeprom(EEPROM_LIGHT_HOUR_ON,0x0);
+                write_eeprom(EEPROM_LIGHT_MIN_ON,0x0);
+                write_eeprom(EEPROM_LIGHT_HOUR_OFF,0x0);
+                write_eeprom(EEPROM_LIGHT_MIN_OFF,0x0);
+                write_eeprom(EEPROM_RELAY1_HOUR_CYCLE,0x0);
+                write_eeprom(EEPROM_RELAY1_SEC_DELAY,0x0);
+                write_eeprom(EEPROM_RELAY2_HOUR_CYCLE,0x0);
+                write_eeprom(EEPROM_RELAY2_SEC_DELAY,0x0);
+                menu_select=false;
+                menu_pos=0;
+                beep();
+                lcd_putc("\f");
+            }
+            break;
+            
+    }
+}

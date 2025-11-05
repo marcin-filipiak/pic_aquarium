@@ -1,0 +1,9 @@
+>>> Warning 225 "Z:\home\kolgreen\Dropbox\Projekty\elektronika\akwarium\v3.0\uC_watchdog\drv\ds1820.c" Line 110(13,18): Duplicate #define
+>>> Warning 205 "Z:\home\kolgreen\Dropbox\Projekty\elektronika\akwarium\v3.0\uC_watchdog\menu.c" Line 73(1,1): Unsigned variable is never less than zero
+>>> Warning 205 "Z:\home\kolgreen\Dropbox\Projekty\elektronika\akwarium\v3.0\uC_watchdog\menu.c" Line 103(1,1): Unsigned variable is never less than zero
+>>> Warning 205 "Z:\home\kolgreen\Dropbox\Projekty\elektronika\akwarium\v3.0\uC_watchdog\menu.c" Line 133(1,1): Unsigned variable is never less than zero
+>>> Warning 207 "Z:\home\kolgreen\Dropbox\Projekty\elektronika\akwarium\v3.0\uC_watchdog\menu.c" Line 165(1,1): Code has no effect
+>>> Warning 208 "aqua3.c" Line 74(208,217): Function not void and does not return a value  clock_isr
+      Memory usage:   ROM=88%      RAM=15% - 23%
+      0 Errors,  6 Warnings.
+Build Successful.

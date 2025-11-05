@@ -1,0 +1,79 @@
+#include <18F877A.h> 
+#fuses HSPLL,NOWDT,NOPROTECT,NOLVP,NODEBUG,VREGEN 
+#use delay(clock=20000000) 
+
+char swich1 = 'f';
+char swich2 = 'f';
+float temperature;
+
+//////////////////////////URZADZENIA PERYFERYJNE//////////////////////////////////////////////// 
+
+
+void blink_green(){
+        LED_ON(LED_GREEN);
+        delay_ms (300);
+        LED_OFF(LED_GREEN);
+        delay_ms (300);
+        LED_ON(LED_GREEN);
+        delay_ms (300);
+        LED_OFF(LED_GREEN);
+}
+
+void beep()
+{
+   Output_high (PIN_B4) ;
+   delay_ms (1000) ;
+   Output_low (PIN_B4) ;
+}
+
+void relay1()
+{
+   //jesli wylaczony to wlaczyc
+   if (swich1 == 'f')
+   {
+      Output_high (PIN_D0) ;
+      swich1 = 'n';
+   }
+
+   //byl wlaczony to wylaczyc
+   else
+   {
+      Output_low (PIN_D0) ;
+      swich1 = 'f';
+   }
+}
+
+
+void relay2()
+{
+   //jesli wylaczony to wlaczyc
+   if (swich2 == 'f')
+   {
+      Output_high (PIN_D1) ;
+      swich2 = 'n';
+   }
+
+   //byl wlaczony to wylaczyc
+   else
+   {
+      Output_low (PIN_D1) ;
+      swich2 = 'f';
+   }
+}
+
+
+////////////////////////MAIN///////////////////////////////////////////////////// 
+
+void main(void) { 
+   char c; 
+/*
+   LED_OFF(LED_GREEN);
+   LED_OFF(LED_RED);
+*/    
+   beep();
+ 
+
+   while (TRUE) { 
+      beep();
+   } 
+}

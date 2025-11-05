@@ -1,0 +1,45 @@
+int8 encoder_pos=0;
+
+int8 read_gray_code_from_encoder(void )
+{ 
+ int8 val=0; 
+
+  if(input(PIN_E1) == true)
+   val |= (1<<1); 
+
+  if(input(PIN_E2) == true)
+   val |= (1<<0); 
+
+  return val;
+}
+
+
+int get_encoder(){
+      int8 val_tmp = read_gray_code_from_encoder();
+      
+      if (input(PIN_E0 == true)) return E_OK;
+
+      if(encoder_pos != val_tmp)
+      { 
+         if( /*(val==2 && val_tmp==3) ||*/
+            (encoder_pos==3 && val_tmp==1) || 
+            /*(val==1 && val_tmp==0) ||*/
+            (encoder_pos==0 && val_tmp==2) 
+          ) 
+         { 
+            return E_UP;
+         } 
+         else if( /*(val==3 && val_tmp==2) ||*/
+            (encoder_pos==2 && val_tmp==0) || 
+            /*(val==0 && val_tmp==1) ||*/
+            (encoder_pos==1 && val_tmp==3) 
+          ) 
+         { 
+            return E_DOWN;
+         } 
+         
+         return E_IDLE;
+
+         encoder_pos = val_tmp; 
+      }
+}

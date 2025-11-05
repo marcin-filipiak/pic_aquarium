@@ -1,0 +1,78 @@
+[PROJECT]
+Target=aqua3.hex
+Processor_Text=PIC16F877A
+CCSVerions=5.025
+Compiler=PCM
+CCSVersion=5.025
+[Target Data]
+FileList=aqua3.c
+[Directories]
+Include=
+[Z:\home\kolgreen\Dropbox\Projekty\Elektronika\akwarium\v3.0\uC\aqua3]
+Type=4
+[mru-list]
+1=aqua3.c
+[ProjectLog]
+Days=3
+D1=08-10-2014
+D1_L=14
+D1_L1=[73450]Project Opened.
+D1_L2=[73545]Started Editing.
+D1_L3=[74044]Stopped Editing.
+D1_L4=[74176]Started Editing.
+D1_L5=[74555]Stopped Editing.
+TotalEdit=17
+TotalDebug=0
+D1_E=16
+D1_D=0
+D1_L6=[74555]Project Closed.
+D1_L7=[74556]Project Opened.
+D1_L8=[74584]Project Closed.
+D1_L9=[74752]Project Opened.
+D1_L10=[74787]Project Closed.
+D1_L11=[74812]Project Opened.
+D1_L12=[75145]Started Editing.
+D1_L13=[75479]Stopped Editing.
+D1_L14=[75479]Project Closed.
+D2=27-03-2021
+D2_L=9
+D2_L1=[26152]Project Opened.
+D2_L2=[26249]Project Closed.
+D2_L3=[26249]Project Opened.
+D2_L4=[26297]Started Editing.
+D2_L5=[26353]Stopped Editing.
+D2_E=1
+D2_D=0
+D2_L6=[26356]Project Closed.
+D2_L7=[26356]Project Opened.
+D2_L8=[26549]Project Closed.
+D2_L9=[26549]Project Opened.
+D3=29-03-2021
+D3_L=1
+D3_L1=[33283]Project Closed.
+[Opened Files]
+1=aqua3.c
+2=functions.c
+3=aqua3.h
+4=menu.c
+5=
+6=aqua3.h
+7=C:\Program Files\PICC\Devices\16F877A.h
+8=
+9=lcd.c
+10=
+[ExtraIncludes]
+Count=7
+1=aqua3=z:\home\kolgreen\dropbox\projekty\elektronika\akwarium\v3.0\uc\lcd.c
+2=aqua3=z:\home\kolgreen\dropbox\projekty\elektronika\akwarium\v3.0\uc\ds1307.c
+3=aqua3=z:\home\kolgreen\dropbox\projekty\elektronika\akwarium\v3.0\uc\ds1820.c
+4=aqua3=z:\home\kolgreen\dropbox\projekty\elektronika\akwarium\v3.0\uc\one_wire.c
+5=aqua3=z:\home\kolgreen\dropbox\projekty\elektronika\akwarium\v3.0\uc\functions.c
+6=aqua3=z:\home\kolgreen\dropbox\projekty\elektronika\akwarium\v3.0\uc\conversion.c
+7=aqua3=z:\home\kolgreen\dropbox\projekty\elektronika\akwarium\v3.0\uc\aqua3.h
+8=aqua3=z:\home\kolgreen\dropbox\projekty\elektronika\akwarium\v3.0\uc\resistometr.c
+[aqua3.c]
+Type=4
+[Units]
+Count=1
+1=aqua3 (main)

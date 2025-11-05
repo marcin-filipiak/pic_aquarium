@@ -1,0 +1,214 @@
+//picpgm -port /dev/ttyS0 -p main.hex -pic 18F4550 -no_verify
+
+#include <18F4550.h> 
+#fuses HSPLL,NOWDT,NOPROTECT,NOLVP,NODEBUG,PLL5,CPUDIV1,VREGEN 
+#use delay(clock=48000000)
+
+
+
+
+//////////////definicje stalych///////////////////////////////////
+#define E_UP   0
+#define E_DOWN 1
+#define E_OK   2
+#define E_IDLE 3
+
+/////////////definicje pinow//////////////////////////////////////
+#define P_BEEPER        PIN_B4 
+#define P_LIGHT         PIN_D3 
+#define P_HEATER        PIN_C6
+#define P_LCDLIGHT      PIN_E1 
+#define DQ              PIN_B3
+
+/////////////definicje stanow/////////////////////////////////////
+#define OFF output_low 
+#define ON  output_high 
+
+/////////////zewnetrzne pliki////////////////////////////////////
+
+#include "lcd.c"
+#include "ds1307.c"
+#include "conversion.c"
+#include "ds1820.c"
+
+
+
+//////////////deklaracja zmiennych///////////////////////////////
+char swich1 = 'f';
+char swich2 = 'f';
+char menu_event=E_IDLE;
+char menu_pos=0;
+boolean menu_select=false;
+byte sec,min,hour;
+
+//long cont=0; 
+//int segundos=0; 
+//////////////functions//////////////////////////////////////////
+
+#include "functions.c"
+
+
+/*
+#int_timer0 
+void trata_tmr0 () { 
+      //set_timer0(0); 
+      cont++; 
+      if(cont >= 11) {
+         segundos++; 
+         cont=0; 
+         beep();
+      } 
+} 
+*/
+
+//////////////main program starts here//////////////////////////
+void main() {
+   float now_t,set_t;
+   
+   int8 i, tmp, numDev = 0; 
+   int16 sensData, celsius, fract; 
+   int8 scratch[9];      
+   unsigned char sign; 
+   
+   //setup_timer_0 (RTCC_DIV_1); 
+   //set_timer0(0); 
+   //enable_interrupts (INT_TIMER0); 
+   //enable_interrupts(GLOBAL); 
+   
+   OFF(P_BEEPER);
+   OFF(P_light);
+   OFF(P_HEATER);
+   ON(P_LCDLIGHT);
+   
+   //inicjalizacja wyswietlacza
+   lcd_init();
+   //wyslanie do pamieci ekranu wlasnych znakow
+   lcd_init_custom_chars();
+   //wyczyszczenie ekranu
+   lcd_putc("\f");
+   lcd_putc("v alfa7");
+   delay_ms(2000); 
+   
+   
+   // Find devices on the bus 
+   numDev = FindDevices();   
+   printf(lcd_putc,"\fall: %u ", numDev); 
+   delay_ms(2000);
+   for(i=1; i<=numDev; i++) 
+   { 
+     printf(lcd_putc,"\fDevice_%u: ", i); 
+     for (tmp=0; tmp<=8; tmp++) {
+        printf(lcd_putc,"%X", FoundROM[i][tmp]); 
+        }
+     delay_ms(2000);
+   } 
+   
+   /*delay_ms(200);
+   ds1820_init();
+   delay_ms(200);  
+   */   
+   
+   
+    while(true){
+    
+        lcd_gotoxy(1,1);
+        numRoms = 1;
+        Send_MatchRom();
+        printf(lcd_putc,"\fDevice_1;", ds1820_read());  
+        delay_ms(1000); 
+        
+        lcd_gotoxy(1,1);
+        numRoms = 1;
+        Send_MatchRom();
+        printf(lcd_putc,"\fDevice_1;", ds1820_read());  
+        delay_ms(1000); 
+    
+      
+      /*  
+      if (!ow_reset())     // If a device is present and it's time to send string 
+      { 
+
+         write_byte(0xCC); // Skip Rom command 
+         write_byte(0x44); // Temperature convert command 
+         output_float(DQ); 
+         delay_ms(750);    // Max. conv. time is 750mS for 12 bit 
+         ow_reset(); 
+          
+          
+         // read all devices on bus 
+         for (numRoms=1; numRoms <= numDev; numRoms++) 
+         { 
+            if (Send_MatchRom()) 
+            { 
+               write_byte(0xBE); // Read scratch pad command                
+               for(i=0; i<2; i++) 
+               { 
+                  scratch[i]= read_byte(); 
+               }            
+               // raw sensor data (16bit) 
+               sensData = make16(scratch[1], scratch[0]); 
+                
+               // check negative 
+               if (bit_test(sensData, 15)) 
+               { 
+                  sign = '-'; 
+                  sensData = ~sensData + 1;                
+               } else 
+                     sign = '+'; 
+    
+               fract = 0; 
+               tmp = sensData&0xF;        // obtain the fractional part nibble                
+               celsius = sensData >> 4 ;  // calculate the whole number part 
+                
+               if (tmp == 0xFF) 
+                   celsius = celsius + 1;    // Calculate the fractional part            
+               else 
+                  for (i=0; i<tmp; i++)    
+                     fract = fract + 0625;    
+               
+               lcd_gotoxy(1,1);
+               printf(lcd_putc,"Device_%u;%c%03lu.%04lu;", numRoms, sign, celsius, fract);  
+               delay_ms(1000); 
+               
+            } 
+         } 
+      }   
+      */ 
+        
+        
+        
+        /*
+        //odczyt nastaw temperatury
+        set_t = read_eeprom(0x00);
+        //jesli nie jest ustawiona to napewno nie jest 255stopni ustawienie domyslnej 25stopni
+        if (set_t == 255) set_t=25;
+        
+        //klik w button, wejscie w menu
+        menu_event = getButton();
+        if (menu_event != E_IDLE) {                
+                change_menu();
+        }
+        
+        //wyswietlenie biezacych informacji
+        if (menu_pos == 0){
+            print_temp(now_t);           
+            delay_ms(1000);
+                    
+            //grzalka
+            //jesli nastawiona jest wieksza od obecnej to wlacz grzalke
+            if (set_t > now_t){
+                        lcd_gotoxy(1,1);
+                        lcd_send_byte(1,0x1);
+                        ON(P_HEATER);
+            }
+            //jesli jest za wysoka to wylacz grzalke
+            if (set_t < now_t) {
+                        lcd_gotoxy(1,1);
+                        lcd_putc(" ");
+                        OFF(P_HEATER);
+            }
+         }
+         */
+
+   }
+}

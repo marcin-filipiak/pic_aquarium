@@ -1,0 +1,31 @@
+[PROJECT]
+Target=main.hex
+Processor_Text=PIC18F4550
+CCSVerions=5.008
+Compiler=PCH
+CCSVersion=5.025
+[Target Data]
+FileList=main.c
+[Directories]
+Include=C:\Program Files\PICC\Devices\;C:\Program Files\PICC\Drivers\;Z:\home\kolgreen\Dropbox\Projekty\Elektronika\akwarium\uC\
+[Z:\home\kolgreen\Dropbox\Projekty\Elektronika\akwarium\uC\]
+Type=4
+[mru-list]
+1=main.c
+[Opened Files]
+1=main.c
+2=lcd.c
+3=
+[main.c]
+Type=4
+[ProjectLog]
+Days=1
+D1=08-10-2014
+D1_L=4
+D1_L1=[70765]Project Opened.
+D1_L2=[70864]Project Closed.
+D1_L3=[72445]Project Opened.
+D1_L4=[72483]Project Closed.
+[Units]
+Count=1
+1=main (main)

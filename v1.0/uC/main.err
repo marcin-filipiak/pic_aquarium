@@ -1,0 +1,7 @@
+>>> Warning 205 "Z:\home\kolgreen\Dropbox\Projekty\Elektronika\akwarium\v1.0\uC\functions.c" Line 222(1,1): Unsigned variable is never less than zero
+>>> Warning 205 "Z:\home\kolgreen\Dropbox\Projekty\Elektronika\akwarium\v1.0\uC\functions.c" Line 252(1,1): Unsigned variable is never less than zero
+>>> Warning 205 "Z:\home\kolgreen\Dropbox\Projekty\Elektronika\akwarium\v1.0\uC\functions.c" Line 282(1,1): Unsigned variable is never less than zero
+>>> Warning 202 "main.c" Line 56(6,12): Variable never used:   swich2
+      Memory usage:   ROM=32%      RAM=3% - 6%
+      0 Errors,  4 Warnings.
+Build Successful.

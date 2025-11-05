@@ -1,0 +1,259 @@
+#include <18F4550.h> 
+#fuses HSPLL,NOWDT,NOPROTECT,NOLVP,NODEBUG,USBDIV,PLL5,CPUDIV1,VREGEN 
+#use delay(clock=48000000) 
+
+#use rs232(baud=9600, xmit=PIN_C6, rcv=PIN_C7)
+
+#use i2c(master,sda=PIN_B0,scl=PIN_B1)
+
+
+
+#include "ds1307.c"
+#include "conversion.c"
+
+#include "one_wire.c"
+#include "ds1820.c"
+
+#include <usb_cdc.h> 
+///////////////////////////////////////////////////////////////////////////// 
+// 
+// If you are using a USB connection sense pin, define it here.  If you are 
+// not using connection sense, comment out this line.  Without connection 
+// sense you will not know if the device gets disconnected. 
+//       (connection sense should look like this: 
+//                             100k 
+//            VBUS-----+----/\/\/\/\/\----- (I/O PIN ON PIC) 
+//                     | 
+//                     +----/\/\/\/\/\-----GND 
+//                             100k 
+//        (where VBUS is pin1 of the USB connector) 
+// 
+///////////////////////////////////////////////////////////////////////////// 
+///only the 18F4550 development kit has this pin 
+//#if __USB_PIC_PERIF__ && defined(__PCH__) 
+// #define USB_CON_SENSE_PIN PIN_B2 
+//#endif 
+
+/////////////////////////////////////////////////////////////////////////////  
+#define LED_ON output_low 
+#define LED_OFF output_high 
+
+char swich1 = 'f';
+char swich2 = 'f';
+float temperature;
+byte sec,min,hour,day,month,year;
+
+
+
+///////////////////////////////////////////////////////////////////////////// 
+// 
+// usb_debug_task() 
+// 
+// When called periodically, displays debugging information over serial 
+// to display enumeration and connection states.  Also lights LED1 based upon 
+// enumeration and status. 
+// 
+///////////////////////////////////////////////////////////////////////////// 
+void usb_debug_task(void) { 
+   static int8 last_connected; 
+   static int8 last_enumerated; 
+   int8 new_connected; 
+   int8 new_enumerated; 
+   static int8 last_cdc; 
+   int8 new_cdc; 
+
+   new_connected=usb_attached(); 
+   new_enumerated=usb_enumerated(); 
+   new_cdc=usb_cdc_connected(); 
+
+   /*
+   if (new_enumerated) 
+      LED_ON(LED_GREEN); 
+   else 
+      LED_OFF(LED_GREEN); 
+
+   if (new_cdc) 
+      LED_ON(LED_GREEN); 
+   else 
+      LED_OFF(LED_GREEN); 
+
+   if (usb_cdc_carrier.dte_present) 
+      LED_ON(LED_RED); 
+   else 
+      LED_OFF(LED_RED);
+   */ 
+
+   /*
+   if (new_connected && !last_connected){
+      printf("USB connected, waiting for enumaration...\r\n\n"); 
+   }
+   if (!new_connected && last_connected){
+      printf("USB disconnected, waiting for connection...\r\n\n"); 
+   }
+   if (new_enumerated && !last_enumerated){ 
+      printf("USB enumerated by PC/HOST\r\n\n"); 
+   }
+   if (!new_enumerated && last_enumerated){ 
+      printf("USB unenumerated by PC/HOST, waiting for enumeration...\r\n\n"); 
+   }
+   */
+   if (new_cdc && !last_cdc) { 
+      printf("\nTTMSB - NoweEnergie.org\n"); 
+      printf(usb_cdc_putc, "\nTTMSB - NoweEnergie.org\n"); 
+   } 
+
+   last_connected=new_connected; 
+   last_enumerated=new_enumerated; 
+   last_cdc=new_cdc; 
+} 
+//////////////////////////URZADZENIA PERYFERYJNE//////////////////////////////////////////////// 
+
+void beep()
+{
+   Output_high (PIN_B4) ;
+   delay_ms (1000) ;
+   Output_low (PIN_B4) ;
+}
+
+void relay1()
+{
+   //jesli wylaczony to wlaczyc
+   if (swich1 == 'f')
+   {
+      Output_high (PIN_D5) ;
+      swich1 = 'n';
+   }
+
+   //byl wlaczony to wylaczyc
+   else
+   {
+      Output_low (PIN_D5) ;
+      swich1 = 'f';
+   }
+}
+
+//MOCE sa na rc6 i rd3
+
+void relay2()
+{
+   //jesli wylaczony to wlaczyc
+   if (swich2 == 'f')
+   {
+      Output_high (PIN_D4) ;
+      swich2 = 'n';
+   }
+
+   //byl wlaczony to wylaczyc
+   else
+   {
+      Output_low (PIN_D4) ;
+      swich2 = 'f';
+   }
+}
+
+//ustawianie zegara
+void set_time()
+{
+   unsigned int t;
+   
+   printf(usb_cdc_putc, "\nday");
+   t = usb_cdc_getc(); 
+   write_ds1307 (4, decToBcd(t)); //day
+
+   printf(usb_cdc_putc, "\nmonth");
+   t = usb_cdc_getc();
+   write_ds1307 (5, decToBcd(t)); //month
+
+   printf(usb_cdc_putc, "\nyear");
+   t = usb_cdc_getc();
+   write_ds1307 (6, decToBcd(t)); //year
+
+   printf(usb_cdc_putc, "\nhour");
+   t = usb_cdc_getc();
+   write_ds1307 (2, decToBcd(t)); //hour
+
+   printf(usb_cdc_putc, "\nmin");
+   t = usb_cdc_getc();
+   write_ds1307 (1, decToBcd(t)); //minute
+
+   printf(usb_cdc_putc, "\nsek");
+   t = usb_cdc_getc();
+   write_ds1307 (0, decToBcd(t)); //second
+}
+
+//czytanie zegara
+void read_time()
+{
+   sec = bcdToDec(read_ds1307 (0)); // read second
+   min = bcdToDec(read_ds1307 (1)); // read minute
+   hour = bcdToDec(read_ds1307 (2)); // read hour
+   day = bcdToDec(read_ds1307 (4)); // read day
+   month = bcdToDec(read_ds1307 (5)); // read month
+   year = bcdToDec(read_ds1307 (6)); // read year
+}
+
+
+////////////////////////MAIN///////////////////////////////////////////////////// 
+
+void main(void) { 
+   char c; 
+   
+   beep();
+   relay1();
+   
+   //usb_init_cs();
+
+
+    //for  10 bit resolution mod
+    /*  
+    onewire_write(0xCC); 
+    onewire_write(0x4E); 
+
+    onewire_write(125); 
+    onewire_write(-55); //this should be done for proper working of DS18B20 
+    onewire_write(127); 
+
+    onewire_reset(); 
+    onewire_write(0xCC); 
+    onewire_write(0x48); 
+    delay_ms(15); 
+    */
+   delay_ms(1000); 
+   beep();
+   relay1();
+
+   while (TRUE) {
+  TRUE ; 
+      /*
+      usb_task(); 
+      usb_debug_task(); 
+
+      if (kbhit()) { 
+         //odebranie z uart znaku
+         c=getc(); 
+         //przekazanie znaku na usb
+         usb_cdc_putc(c);
+      } 
+      if (usb_cdc_kbhit()) { 
+
+         c=usb_cdc_getc(); 
+
+         switch (c){
+                   case 'm': relay1(); blink_green(); break;
+                   case 'n': relay2(); blink_green(); break;
+                   case 's': beep(); break;
+                   case 'u': up(); break;
+                   case 'd': down(); break;
+                   case 'l': left(); break;
+                   case 'r': right(); break;
+                   case 'o': set_time(); blink_green(); break;
+                   case 'y': read_time(); printf (usb_cdc_putc,"%d-%d-%d %d:%d:%d", day, month, year, hour, min, sec); blink_green(); break;
+                   case 't': temperature = ds1820_read(); printf(usb_cdc_putc,"%3.1f",temperature);  blink_green(); break;
+                   case 'p': printf(usb_cdc_putc, "ok");  blink_green(); break;
+                   default:  break;
+         }
+      }
+      */
+     } 
+     
+}

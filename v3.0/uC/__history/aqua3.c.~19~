@@ -1,0 +1,291 @@
+#include <aqua3.h>
+
+#use i2c(master,sda=PIN_B0,scl=PIN_B1)
+
+//////////////definicje stalych///////////////////////////////////
+/*
+#define E_UP   0
+#define E_DOWN 1
+#define E_OK   2
+#define E_IDLE 3
+*/
+
+#define EEPROM_TEMP            0x00 //temperatura
+#define EEPROM_LIGHT_HOUR_ON   0x1  //godzina wlaczenia swiatla
+#define EEPROM_LIGHT_MIN_ON    0x2  //minuta wlaczenia swiatla
+
+#define EEPROM_LIGHT_HOUR_OFF  0x3  //godzina wylaczenia swiatla
+#define EEPROM_LIGHT_MIN_OFF   0x4  //minuta wylaczenia swiatla
+
+#define EEPROM_FEED_HOUR_CYCLE 0x5 //cykl co ile godzin wlaczyc karmienie
+#define EEPROM_FEED_SEC_DELAY  0x6 //czas wlaczenia karmienia
+
+#define EEPROM_AIR_HOUR_CYCLE 0x7 //cykl co ile godzin wlaczyc powietrze
+#define EEPROM_AIR_MIN_DELAY  0x8 //czas wlaczenia powietrza
+
+//domyslne ustawienia kolejnych bitow w pamieci EEPROM zaraz po zaprogramowaniu
+//zaczynamy od adresu 0x0
+#ROM int8 0xF00000 = { 26, 8, 1, 18, 2, 0, 0, 0, 0 } 
+
+/////////////definicje pinow//////////////////////////////////////
+
+#define P_FEED          PIN_C3 //karmienie
+#define P_AIR           PIN_D0 //napowietrzanie
+#define P_LIGHT         PIN_C1 //oswietlenie triak
+#define P_HEATER        PIN_C2 //grzalka triak
+#define P_BEEPER        PIN_D1 //sygnalizator dzwiekowy
+#define P_LCDLIGHT      PIN_D2 //podswietlenie ekranu
+#define DQ              PIN_B3 //dane 1wire
+
+/////////////definicje stanow/////////////////////////////////////
+
+#define OFF output_low 
+#define ON  output_high 
+
+/////////////zewnetrzne pliki////////////////////////////////////
+
+#include "lcd.c"        //obsluga wyswietlacza
+#include "ds1307.c"     //zegar czasu rzeczywistego
+#include "conversion.c" //konwersje liczbowe
+#include "ds1820.c"     //termometry na 1wire
+#include "resistometr.c"
+
+//////////////deklaracja zmiennych///////////////////////////////
+
+char menu_event=E_IDLE;
+char menu_pos=0;
+boolean menu_select=false;
+byte sec,min,hour;
+
+int8 last_air_hour_on = 0; //ostatnie wlaczenie napowietrzania
+int8 last_feed_hour_on = 0; //ostatnie wlaczenie karmienia
+
+//////////////functions//////////////////////////////////////////
+#include "functions.c"
+
+//////////////main program starts here//////////////////////////
+void main() {
+   float now_t_aqua, set_t;
+   
+   int16 started_air = 0;   //w sekundach startu powietrza
+   int16 started_feed = 0;  //w sekundach startu karmienia
+    
+   int8 numDev = 0; 
+   
+   delay_ms(100);
+   
+   //setup_adc( ADC_CLOCK_INTERNAL );
+   setup_adc_ports(AN0_AN1_AN2_AN3_AN4); 
+   setup_adc(ADC_CLOCK_DIV_64);
+      
+   ON(P_LIGHT);
+   ON(P_HEATER);
+   ON(P_LCDLIGHT);   
+        
+   //inicjalizacja wyswietlacza
+   lcd_init();
+   //wyslanie do pamieci ekranu wlasnych znakow
+   lcd_init_custom_chars();
+   //wyczyszczenie ekranu
+   lcd_putc("\fNoweEnergie.org\nv3"); 
+   delay_ms(1000);
+         
+   // Find devices on the bus 
+   numDev = FindDevices();
+   if (numDev>0){
+           printf(lcd_putc,"\fTermometr\nzainstalowany."); 
+   }
+   else {
+          printf(lcd_putc,"\fPodlacz\ntermometr!"); 
+   }
+          
+   delay_ms(1000);   
+   printf(lcd_putc,"\f");
+   
+   while(true){
+        
+         
+         /*
+         set_adc_channel(1);
+         delay_us(1); 
+         int16 ana=read_ADC();    
+         delay_us(1); 
+         //lcd_gotoxy(3,1);
+         //printf(lcd_putc,"a/d: %lu", ana);
+         delay_us(1000); 
+        */
+        
+        //--klik w jakis button, wejscie w menu--
+        //UWAGA: obsluga menu musi byc na poczatku petli, 
+        //bo inaczej np. odczyty czasu by byly przedatowane 
+        //(nie sa odczytywane przez czas pobytu w menu)
+        
+        //menu_event = ReadResistometrMenu(ana);
+        menu_event = getButton();
+        
+        if (menu_event != E_IDLE) {
+                ON(P_LCDLIGHT); //zapal podswietlenie LCD
+                change_menu();  //obsluga menu
+                delay_ms(2000);
+        }
+        
+        
+        //ODCZYT CZASU Z RTC
+        read_time();
+        delay_ms(50);
+        
+        //ODCZYT TEMPERATUR
+        //termometr wody
+        if (numDev>0){
+                lcd_gotoxy(1,1);
+                now_t_aqua = ds1820_read(0x1); //id 1
+                delay_ms(50);
+        }
+        
+      
+        //ODCZYT NASTAW TEMPERATUR
+        set_t = read_eeprom(0x00);
+        //jesli nie jest ustawiona to napewno nie jest 255stopni ustawienie domyslnej 25stopni
+        if (set_t == 255) set_t=25;
+                
+        //---wyswietlenie biezacych informacji i wykonywanie biezacych zadan---
+        if (menu_pos == 0){
+        
+            //wyswietl tmperatur wody
+            if (numDev>0){
+                    print_aqua_temp(now_t_aqua);
+            }
+            //wyswietl czas
+            print_time();
+            
+            //ALARM ZBYT WYSOKIEJ TEMPERATURY
+            if (numDev>0){
+                    if(now_t_aqua >= 29 && sec==0){
+                       beep(500);
+                       lcd_gotoxy(5,1);
+                       lcd_send_byte(1,0x3);
+                    }
+            }
+           
+            //PODSWIETLANIE EKRANU
+            //od godziny 17:00 do 8:00
+            if ( hour > 17 || hour < 8){
+                     ON(P_LCDLIGHT); //zapal podswietlenie LCD
+             }
+             //w dzien wylaczony
+             else {
+                     OFF(P_LCDLIGHT); //wylacz podswietlenie LCD
+             }
+                    
+            //GRZALKA
+            //jesli nie ma bledu odczytu
+            if (now_t_aqua != 1111.0 && numDev>0){
+               //jesli nastawiona jest wieksza od obecnej to wlacz grzalke
+               if (set_t > now_t_aqua){
+                        lcd_gotoxy(1,1);
+                        lcd_send_byte(1,0x1);
+                        ON(P_HEATER);
+               }
+               //jesli jest za wysoka to wylacz grzalke
+               if (set_t < now_t_aqua) {
+                        lcd_gotoxy(1,1);
+                        lcd_putc(" ");
+                        OFF(P_HEATER);
+               }
+            }
+            //jesli jest blad odczytu
+            else {
+                        lcd_gotoxy(1,1);
+                        lcd_putc(" ");
+                        OFF(P_HEATER);
+            }
+
+            
+            //INSTRUKCJE WYWOLANE ZEGAREM
+            //TODO: obawiam sie ze nie dziala np. ON18:00 OFF 3:00
+            //jesli czas wlaczenia oswietlenia
+             if (read_eeprom(EEPROM_LIGHT_HOUR_ON) <= hour && read_eeprom(EEPROM_LIGHT_MIN_ON) <= min){
+                     lcd_gotoxy(2,1);
+                     lcd_send_byte(1,0x0);
+                     ON(P_LIGHT);
+             }
+             //jesli czas wylaczenia oswietlenia
+             if (read_eeprom(EEPROM_LIGHT_HOUR_OFF) <= hour && read_eeprom(EEPROM_LIGHT_MIN_OFF) <= min){
+                  lcd_gotoxy(2,1);
+                  lcd_putc(" ");
+                  OFF(P_LIGHT);
+             }
+             
+             //jesli czas karmienia i oczywiscie jesli jest wlaczony w opcjach
+             if (read_eeprom(EEPROM_FEED_HOUR_CYCLE) != 0){
+                if (read_eeprom(EEPROM_FEED_HOUR_CYCLE) <= (hour - last_feed_hour_on)){
+                        
+                        lcd_gotoxy(3,1);
+                        lcd_send_byte(1,0x5);
+                        ON(P_FEED);
+                                        
+                        //nie byl wystartowany to wystartowac wpisujac czas startu
+                        if (started_feed == 0){
+                                //wpisacz czas w sekundach kiedy wystartowal
+                                started_feed = ((hour * 3600) + (min * 60) + sec);
+                                //beep();
+                        }
+                        //zostal wystartowany
+                        else {
+                                //obliczenie roznicy sekund miedzy startem a teraz
+                                int16 abso =  ((hour * 3600) + (min * 60) + sec) - started_feed;
+                                lcd_gotoxy(5,1);
+                                //printf(lcd_putc,"%lu %lu", (int16)started_feed, (int16)((hour * 3600) + (min * 60) + sec));
+                                
+                                //czas zakonczony
+                                if ( read_eeprom(EEPROM_FEED_SEC_DELAY) < (int8)abso){
+                                        OFF(P_FEED);   
+                                        started_feed = 0; 
+                                        last_feed_hour_on = hour;
+                                        lcd_gotoxy(3,1);
+                                        lcd_putc(" ");                            
+                                }
+                        }
+
+
+                }
+             }
+             
+             //jesli czas wlaczenia napowietrzania i oczywiscie jesli jest wlaczony w opcjach
+             if (read_eeprom(EEPROM_AIR_HOUR_CYCLE) != 0){
+                if (read_eeprom(EEPROM_AIR_HOUR_CYCLE) <= (hour - last_air_hour_on)){
+
+                        lcd_gotoxy(4,1);
+                        lcd_send_byte(1,0x7);
+                        ON(P_AIR);
+                                        
+                        //nie byl wystartowany to wystartowac wpisujac czas startu
+                        if (started_air == 0){
+                                //wpisac czas w minutach kiedy wystartowal
+                                started_air = ((hour * 60) + min);
+                                //beep();
+                        }
+                        //zostal wystartowany
+                        else {
+                                //obliczenie roznicy minut miedzy startem a teraz
+                                int16 abso =  ((hour * 60) + min) - started_air;        
+                                lcd_gotoxy(5,1);
+                                //printf(lcd_putc,"%lu %lu", (int16)started_air, (int16)((hour * 60) + min );
+                                
+                                //czas zakonczony
+                                if ( read_eeprom(EEPROM_AIR_MIN_DELAY) < (int8)abso){
+                                        OFF(P_AIR);   
+                                        started_air = 0; 
+                                        last_air_hour_on = hour;
+                                        lcd_gotoxy(4,1);
+                                        lcd_putc(" ");                            
+                                }
+                        }
+                
+                }
+             }
+             
+             
+       }
+   }
+}

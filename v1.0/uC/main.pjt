@@ -1,0 +1,16 @@
+[Opened Files]
+1=main.c
+2=functions.c
+3=ds1820.c
+4=lcd.c
+5=ds1307.c
+6=
+[PROJECT]
+Processor=0x4550
+Processor_Text=PIC18F4550
+[Target Data]
+OptionString=-p +FH
+FileList=E:\uC\main.c
+[Units]
+Count=1
+1=main.c (main)

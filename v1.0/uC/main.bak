@@ -1,0 +1,249 @@
+//picpgm -port /dev/ttyS0 -p main.hex -pic 18F4550 -no_verify
+
+#include <18F4550.h> 
+#fuses HSPLL,NOWDT,NOPROTECT,NOLVP,NODEBUG,PLL5,CPUDIV1,VREGEN 
+#use delay(clock=48000000)
+
+#use i2c(master,sda=PIN_B0,scl=PIN_B1)
+
+
+
+//////////////definicje stalych///////////////////////////////////
+#define E_UP   0
+#define E_DOWN 1
+#define E_OK   2
+#define E_IDLE 3
+
+#define EEPROM_TEMP            0x00 //temperatura
+#define EEPROM_LIGHT_HOUR_ON   0x1  //godzina wlaczenia swiatla
+#define EEPROM_LIGHT_MIN_ON    0x2  //minuta wlaczenia swiatla
+
+#define EEPROM_LIGHT_HOUR_OFF  0x3  //godzina wylaczenia swiatla
+#define EEPROM_LIGHT_MIN_OFF   0x4  //minuta wylaczenia swiatla
+
+#define EEPROM_ID_TSENSOR_AQUA 0x5  //numer czujnika temperatury wody
+#define EEPROM_ID_TSENSOR_ROOM 0x6  //numer czujnika temperatury pokojowej
+
+#define EEPROM_RELAY1_HOUR_CYCLE 0x7 //cykl co ile godzin wlaczyc przekaznik 1
+#define EEPROM_RELAY1_SEC_DELAY  0x8 //czas wlaczenia przekaznika 1
+
+#define EEPROM_RELAY2_HOUR_CYCLE 0x9 //cykl co ile godzin wlaczyc przekaznik 2
+#define EEPROM_RELAY2_SEC_DELAY  0x10 //czas wlaczenia przekaznika 2
+
+/////////////definicje pinow//////////////////////////////////////
+#define P_RELAY1        PIN_D4 //przekaznik 1
+#define P_RELAY2        PIN_C7 //przekaznik 2
+#define P_BEEPER        PIN_B4 //sygnalizator dzwiekowy
+#define P_LIGHT         PIN_D3 //oswietlenie triak
+#define P_HEATER        PIN_C6 //grzalka triak
+#define P_LCDLIGHT      PIN_E1 //podswietlenie ekranu
+#define DQ              PIN_B3 //dane 1wire
+
+/////////////definicje stanow/////////////////////////////////////
+#define OFF output_low 
+#define ON  output_high 
+
+/////////////zewnetrzne pliki////////////////////////////////////
+
+#include "lcd.c"        //obsluga wyswietlacza
+#include "ds1307.c"     //zegar czasu rzeczywistego
+#include "conversion.c" //konwersje liczbowe
+#include "ds1820.c"     //termometry na 1wire
+
+
+//////////////deklaracja zmiennych///////////////////////////////
+char swich1 = 'f';
+char swich2 = 'f';
+char menu_event=E_IDLE;
+char menu_pos=0;
+boolean menu_select=false;
+byte sec,min,hour;
+
+//long cont=0; 
+//int segundos=0; 
+//////////////functions//////////////////////////////////////////
+
+#include "functions.c"
+
+/*
+//timer
+#int_timer0 
+void trata_tmr0 () { 
+      //set_timer0(0); 
+      cont++; 
+      if(cont >= 11) {
+         segundos++; 
+         cont=0; 
+         beep();
+      } 
+} 
+*/
+
+//////////////main program starts here//////////////////////////
+void main() {
+   float now_t_room, now_t_aqua, set_t;
+   int8 last_relay1_hour_on = 0; //ostatnie wlaczenie przekaznika1
+   int8 last_relay2_hour_on = 0; //ostatnie wlaczenie przekaznika2
+   
+   int8 numDev = 0; 
+   
+   //obsluga timera
+   //setup_timer_0 (RTCC_DIV_1); 
+   //set_timer0(0); 
+   //enable_interrupts (INT_TIMER0); 
+   //enable_interrupts(GLOBAL); 
+   
+   OFF(P_BEEPER);
+   OFF(P_light);
+   OFF(P_HEATER);
+   ON(P_LCDLIGHT);
+   
+   //inicjalizacja wyswietlacza
+   lcd_init();
+   //wyslanie do pamieci ekranu wlasnych znakow
+   lcd_init_custom_chars();
+   //wyczyszczenie ekranu
+   lcd_putc("\f");
+   lcd_putc("v0.9\nNoweEnergie.org");
+   delay_ms(2000); 
+   
+   
+   // Find devices on the bus 
+   numDev = FindDevices();   
+   printf(lcd_putc,"\fWykryto\n%u czujniki", numDev); 
+   delay_ms(2000);
+   /*
+   //wyswietlenie adresow czujnikow
+   int8 i, tmp;
+   for(i=1; i<=numDev; i++) 
+   { 
+     printf(lcd_putc,"\fDevice_%u: ", i); 
+     for (tmp=0; tmp<=8; tmp++) {
+        printf(lcd_putc,"%X", FoundROM[i][tmp]); 
+        }
+     delay_ms(2000);
+   } 
+   */
+  
+    printf(lcd_putc,"\f");
+    while(true){
+    
+        //ODCZYT CZASU Z RTC
+        read_time();
+        delay_ms(100);
+        
+        //ODCZYT TEMPERATUR
+        //jesli zdefiniowano sensor
+        if (read_eeprom(EEPROM_ID_TSENSOR_AQUA) < 5){
+            //termometr pokojowy
+            lcd_gotoxy(1,1);
+            now_t_room= ds1820_read(read_eeprom(EEPROM_ID_TSENSOR_ROOM)); //id 2
+            delay_ms(500);
+            //termometr wody
+            lcd_gotoxy(1,1);
+            now_t_aqua = ds1820_read(read_eeprom(EEPROM_ID_TSENSOR_AQUA)); //id 1
+            delay_ms(500); 
+        }
+        //nie zdefiniowano sensorow
+        else {
+           now_t_room = 0;
+           now_t_aqua = 0;
+        }
+      
+        //ODCZYT NASTAW TEMPERATUR
+        set_t = read_eeprom(0x00);
+        //jesli nie jest ustawiona to napewno nie jest 255stopni ustawienie domyslnej 25stopni
+        if (set_t == 255) set_t=25;
+        
+        //--klik w jakis button, wejscie w menu--
+        menu_event = getButton();
+        if (menu_event != E_IDLE) {
+                ON(P_LCDLIGHT); //zapal podswietlenie LCD
+                change_menu();  //obsluga menu
+        }
+                
+        //---wyswietlenie biezacych informacji i wykonywanie biezacych zadan---
+        if (menu_pos == 0){
+            print_aqua_temp(now_t_aqua);
+            print_room_temp(now_t_room);
+            print_time();
+            //delay_ms(1000);
+                    
+            //PODSWIETLANIE EKRANU
+            //od godziny 17:00 do 8:00
+            if ( hour > 17 || hour < 8){
+                     ON(P_LCDLIGHT); //zapal podswietlenie LCD
+             }
+             //w dzien wylaczony
+             else {
+                     OFF(P_LCDLIGHT); //wylacz podswietlenie LCD
+             }
+                    
+            //GRZALKA
+            //jesli zdefiniowane sa czujniki, jesli nie to uzytkownik musi w menu ustawic ktory jest ktory
+            if (now_t_aqua != 0 && now_t_room !=0){
+               //jesli nastawiona jest wieksza od obecnej to wlacz grzalke
+               if (set_t > now_t_aqua){
+                        lcd_gotoxy(1,1);
+                        lcd_send_byte(1,0x1);
+                        ON(P_HEATER);
+               }
+               //jesli jest za wysoka to wylacz grzalke
+               if (set_t < now_t_aqua) {
+                        lcd_gotoxy(1,1);
+                        lcd_putc(" ");
+                        OFF(P_HEATER);
+               }
+            }
+            else {
+               lcd_gotoxy(1,1);
+               lcd_putc("!");
+            }
+            
+            //INSTRUKCJE WYWOLANE ZEGAREM
+            //TODO: obawiam sie ze nie dziala np. ON18:00 OFF 3:00
+            //jesli czas wlaczenia oswietlenia
+             if (read_eeprom(EEPROM_LIGHT_HOUR_ON) <= hour && read_eeprom(EEPROM_LIGHT_MIN_ON) <= min){
+                     lcd_gotoxy(2,1);
+                     lcd_send_byte(1,0x0);
+                     ON(P_LIGHT);
+             }
+             //jesli czas wylaczenia oswietlenia
+             if (read_eeprom(EEPROM_LIGHT_HOUR_OFF) <= hour && read_eeprom(EEPROM_LIGHT_MIN_OFF) <= min){
+                  lcd_gotoxy(2,1);
+                  lcd_putc(" ");
+                  OFF(P_LIGHT);
+             }
+             
+             //jesli czas wlaczenia przekaznika1 i oczywiscie jesli jest wlaczony
+             if (read_eeprom(EEPROM_RELAY1_HOUR_CYCLE) != 0){
+                if (read_eeprom(EEPROM_RELAY1_HOUR_CYCLE) <= (hour - last_relay1_hour_on)){
+                        last_relay1_hour_on = hour;
+                        lcd_gotoxy(3,1);
+                        lcd_send_byte(1,0x7);
+                        ON(P_LIGHT);
+                        ON(P_RELAY1);
+                        delay_ms(read_eeprom(EEPROM_RELAY1_SEC_DELAY)*1000);
+                        OFF(P_RELAY1);
+                        lcd_gotoxy(3,1);
+                        lcd_putc(" ");
+                }
+             }
+             
+             //jesli czas wlaczenia przekaznika2 i oczywiscie jesli jest wlaczony
+             if (read_eeprom(EEPROM_RELAY2_HOUR_CYCLE) != 0){
+                if (read_eeprom(EEPROM_RELAY2_HOUR_CYCLE) <= (hour - last_relay2_hour_on)){
+                        last_relay2_hour_on = hour;
+                        lcd_gotoxy(4,1);
+                        lcd_send_byte(1,0x7);
+                        ON(P_LIGHT);
+                        ON(P_RELAY2);
+                        delay_ms(read_eeprom(EEPROM_RELAY2_SEC_DELAY)*1000);
+                        OFF(P_RELAY2);
+                        lcd_gotoxy(4,1);
+                        lcd_putc(" ");
+                }
+             }
+         }
+   }
+}
